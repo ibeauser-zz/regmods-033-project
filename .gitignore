@@ -1,0 +1,9 @@
+.DS_Store
+.Rproj.user
+.Rhistory
+.RData
+regmods-033-project.Rproj
+Regression_Models_Course_Project.tex
+Regression_Models_Course_Project-tikzDictionary
+Regression_Models_Course_Project_files/*
+scratch.R

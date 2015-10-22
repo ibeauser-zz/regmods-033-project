@@ -1,0 +1,49 @@
+---
+title: "Regression Models Course Project"
+subtitle: "A study of the relationship between transmission type and fuel economy
+in vehicles in the mtcars dataset"
+author: "I. Beauser"
+date: "`r Sys.Date()`"
+output: 
+    pdf_document:
+      fig_caption: yes
+      highlight: haddock 
+      keep_tex: yes
+      template: regmods.tex
+documentclass: article
+fontsize: 11pt
+fontfamily: mathpazo
+fontfamilyoptions: ["osf","sc"]
+geometry: ["paper=letterpaper",
+            "textwidth=7.5in",
+            "noheadfoot",
+            "vmargin=.5in"]
+---
+```{r 'setup', include=FALSE, cache=FALSE}
+if (!require("tikzDevice")) {
+    install.packages("tikzDevice", dep = TRUE, repos = "http://cran.rstudio.com/")
+    library(tikzDevice)
+}
+knitr::read_chunk('test-for-and-install-packages.R')
+knitr::opts_chunk$set(echo=TRUE,collapse=FALSE,cache=FALSE,message=FALSE,highlight=TRUE,tidy=TRUE,strip.white=TRUE,collapse=FALSE,fig.show='hold',background='springgreen3')
+```
+***
+
+### Executive Summary
+
+*Motor Trend*, a magazine about the automobile industry, is interested in how fuel economy, measured in miles per gallon (MPG), differs between those automobiles with automatic transmissions, and those with manual transmissions.  The data for their analysis is sourced from the `mtcars` dataset.  The magazine's analysis targeted two main requirements:  
+
+1. Answer the question, "Is an automatic or manual transmission better for MPG?", and
+2. Quantify the MPG difference between automatic and manual transmissions.  
+
+In summary, the analysis shows that an automobile with manual transmission has better fuel economy than that of a car with automatic transmission.  After other factors affecting fuel economy are accounted for, in general, manual transmission vehicles are expected to exceed the fuel economy of those with automatic transmissions by x%.  
+
+### The Data  
+
+### The Analysis  
+
+### Discussion and Conclusion  
+
+***
+
+#### Figures  
