@@ -8,42 +8,132 @@ output:
     pdf_document:
       fig_caption: yes
       highlight: haddock 
-      keep_tex: yes
+      keep_tex: no
       template: regmods.tex
 documentclass: article
-fontsize: 11pt
+fontsize: 10pt
 fontfamily: mathpazo
 fontfamilyoptions: ["osf","sc"]
 geometry: ["paper=letterpaper",
             "textwidth=7.5in",
-            "noheadfoot",
-            "vmargin=.5in"]
+            "vmargin=.4in"]
+references:
+- id: 1-mtcars
+  title: Building multiple regression models interactively.
+  container-title: Biometrics
+  volume: 37
+  page: 391-411
+  issued: 1981
+  author:
+  - family: Henderson and Velleman
+- id: 2-Rdatasets
+  title: The R Datasets Package
+  author: 
+  - family: R Core Team and contributors worldwide
+  publisher: R Core Team <R-core@r-project.org>
+  version: 3.2.2
+  issued: 2015-08-16
 ---
+
 ```{r 'setup', include=FALSE, cache=FALSE}
 if (!require("tikzDevice")) {
     install.packages("tikzDevice", dep = TRUE, repos = "http://cran.rstudio.com/")
     library(tikzDevice)
 }
 knitr::read_chunk('test-for-and-install-packages.R')
-knitr::opts_chunk$set(echo=TRUE,collapse=FALSE,cache=FALSE,message=FALSE,highlight=TRUE,tidy=TRUE,strip.white=TRUE,collapse=FALSE,fig.show='hold',background='springgreen3')
+knitr::opts_chunk$set(echo=TRUE,collapse=FALSE,cache=FALSE,message=FALSE,highlight=TRUE,tidy=TRUE,strip.white=TRUE,collapse=FALSE)
 ```
 ***
 
-### Executive Summary
+## Executive Summary
 
-*Motor Trend*, a magazine about the automobile industry, is interested in how fuel economy, measured in miles per gallon (MPG), differs between those automobiles with automatic transmissions, and those with manual transmissions.  The data for their analysis is sourced from the `mtcars` dataset.  The magazine's analysis targeted two main requirements:  
+*Motor Trend*, a magazine about the automobile industry, is interested in how fuel economy, measured in miles per gallon (MPG), differs between those automobiles with automatic transmissions, and those with manual transmissions.  The data for their analysis is sourced from the `mtcars` dataset [@1-mtcars].  The magazine's analysis targeted two main requirements:  
 
 1. Answer the question, "Is an automatic or manual transmission better for MPG?", and
 2. Quantify the MPG difference between automatic and manual transmissions.  
 
-In summary, the analysis shows that an automobile with manual transmission has better fuel economy than that of a car with automatic transmission.  After other factors affecting fuel economy are accounted for, in general, manual transmission vehicles are expected to exceed the fuel economy of those with automatic transmissions by x%.  
+In summary, the analysis shows that an automobile with manual transmission has better fuel economy than that of a car with automatic transmission.  After other factors affecting fuel economy are held constant, on average manual transmission vehicles are expected to exceed the fuel economy of those with automatic transmissions by ~42%.  
 
-### The Data  
+## The Data  
 
-### The Analysis  
+The description [@2-Rdatasets] from the `mtcars` dataset says the data was "extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models)."  The documentation provides the variable names and descriptions.  
 
-### Discussion and Conclusion  
+Examing the correlation between `mpg` (miles-per-gallon) and the remaining variables suggests which variables might be included in the model.  The results below have eliminated those variables with a weaker (< 0.5) correlation to `mpg` than the others.
+
+```{r feat-cor, echo=FALSE}
+# credit Brandon Bertelsen answer at http://stackoverflow.com/questions/7074246/show-correlations-as-an-ordered-list-not-as-a-large-matrix
+library(reshape2); data("mtcars")
+corr <- cor(mtcars[1],mtcars[-1])
+corr[abs(corr) < 0.5] <- NA # drop less than abs(0.5)
+corr <- na.omit(melt(corr))
+corr[order(-abs(corr$value)),] # sort
+```
+
+The variable `am` (Automatic vs Manual transmission), though having the second to lowest correlation to `mpg` of the remaining variables, is kept as the predictor of principle interest.  Those variables that have a strong (> 0.7) correlation to `mpg` are kept too as probable confounders.  The variable `am` is converted to a factor and labelled according to the dataset description, for further analysis.
+
+```{r feat-sub, echo=FALSE}
+selected <- as.vector(corr[which(abs(corr$value) > 0.7 | corr$Var2 == 'am'),][,2])
+selected <- c(selected,'mpg')
+mtcars.subset <- subset(mtcars, select = selected)
+mtcars.subset$am <- factor(mtcars.subset$am, levels = c(0,1), labels = c("Automatic","Manual"))
+str(mtcars.subset)
+```
+
+## Model Selection  
+```{r pvalue, echo=FALSE}
+lmfit1 <- lm(mpg ~ am, mtcars.subset)
+am.pvalue <- round(summary(lmfit1)$coef[2,4],5)
+intercept <- round(summary(lmfit1)$coef[2,1],2)
+slope <- round(summary(lmfit1)$coef[2,2],2)
+```
+
+A linear model *lm(mpg ~ factor(am), mtcars)* has a statistically significant p-value (`r format(am.pvalue,scientific=FALSE)` < 0.05) suggesting that changes in `mpg` are strongly associated with a change in transmission type.  
+```{r echo=FALSE}
+summary(lmfit1)$coef
+```
+However, the influences of the other strongly correlated variables `wt` (weight in thousands of pounds), `cyl` (number of cylinders), `hp` (horsepower), and `disp` (cubic inches of displacement) need to be examined.  
+
+Intuition suggests and testing shows a very strong correlation (`r cor(mtcars.subset$disp,mtcars.subset$cyl)`) and statistically significant (p-value = `r format(summary(lm(disp~cyl,mtcars.subset))$coef[2,4],scientific=TRUE)`) relationship between displacement and number of cylinders, so that `disp` can be a proxy for `cyl` in further testing.  Similarly, `disp` will serve as a proxy for `hp` due to the strong correlation (`r cor(mtcars.subset$disp,mtcars.subset$hp)`) and statistically significant (p-value = `r format(summary(lm(disp~hp,mtcars.subset))$coef[2,4],scientific=TRUE)`) relationship between the two.  With these substitutions, a nested likelihood ratio test is run using the `anova` function on three models: the first, the simple one with only `am` as a predictor; the other two to test if the additional parameters `wt` and `disp` are needed.  
+```{r anova1, echo=FALSE}
+lmfit2 <- lm(mpg ~ am + wt, mtcars.subset)
+lmfit3 <- lm(mpg ~ am + wt + disp, mtcars.subset)
+anova(lmfit1,lmfit2,lmfit3)
+```
+The test including the second model is highly significant (p-value =  `r format(anova(lmfit1,lmfit2,lmfit3)[2,6],scientific=TRUE)`), suggesting the additional parameters should be included.  Adding displacement is not statistically significant.  
+
+Additionally, the influence of each parameter on the coefficient can be tested.  
+```{r param-influence, echo=FALSE}
+fit1 <- lm(mpg ~ am, mtcars.subset)
+fit2 <- lm(mpg ~ am + wt, mtcars.subset)
+fit3 <- lm(mpg ~ am + wt + disp, mtcars.subset)
+fit4 <- lm(mpg ~ am + disp, mtcars.subset)
+df <- as.data.frame(rbind(summary(fit1)$coef[2,c(1,4)],summary(fit2)$coef[2,c(1,4)],summary(fit3)$coef[2,c(1,4)],summary(fit4)$coef[2,c(1,4)]))
+rownames(df) <- c('Model 1: mpg ~ am','Model 2: mpg ~ am + wt','Model 3: mpg ~ am + wt + disp','Model 4: mpg ~ am + disp')
+df
+```
+In this test, the p-value of Model 2 is insignificant, as is that of both the combined parameters and the `disp` parameter alone.  Therefore, Model 1 is selected and it estimates, by the intercept coefficient, that a manual transmission car gets an expected `r format(intercept,scientific=FALSE)` miles per gallon more than that obtained by an automatic, all other parameters held constant.  
+
+## Residual Analysis  
+The Normal Q-Q plot does not raise any concerns with the fit of Model 1 (Fig 1), as the residual distrubtion meets the "pencil test" ([link to B. Caffo video](https://youtu.be/XEqlmqFTVOI?list=PLpl-gQkQivXji7JK1OP1qS7zalwUBPrX0)).  
+
+Using the `predict` function, the confidence interval of the prediction can be calculated.  
+```{r predictCI, echo=FALSE}
+mtfit <- lm(mpg ~ am, data = mtcars)
+mtpredict <- predict(mtfit, newdata = list(am=1),interval="prediction",level=0.95)
+atpredict <- predict(mtfit, newdata = list(am=0),interval="prediction",level=0.95)
+mtpredict
+```
+The calulation implies a 95% confidence that the mean MPG for a manual transmission car falls within the range `r round(mtpredict[,2],0)` to `r round(mtpredict[,3],0)` mpg.  A similar calulation provided 95% confidence that the mean MPG for an automatic transmission car falls in the range `r round(atpredict[,2],0)` to `r round(atpredict[,3],0)` mpg. Thus, on average, the manual car in the sample set is approximately `r round(((mtpredict[,1]/atpredict[,1])-1),2)*100`% more fuel efficient than the automatic.
+
+```{r Fig1, echo=FALSE, fig.cap="Model 1 Residual Analysis", fig.width=5, fig.show='asis'}
+plot(lmfit1,which = 2)
+```
+
+
 
 ***
 
-#### Figures  
+
+
+
+### References

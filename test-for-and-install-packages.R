@@ -1,5 +1,9 @@
 ## ---- setup
 repos = "http://cran.rstudio.com/"
+if (!require("reshape2")) {
+    install.packages("reshape2", dep = TRUE, repos = repos)
+    library(reshape2)
+}
 if (!require("datasets")) {
     install.packages("datasets", dep = TRUE, repos = repos)
     library(datasets)
